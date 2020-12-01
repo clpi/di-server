@@ -4,12 +4,70 @@ pub mod response;
 
 use pool::ThreadPool;
 use std::{
+    env,
     fs::read_to_string,
     io::{self, prelude::*},
     net::{TcpListener, TcpStream}, thread, time::Duration};
 
+fn get_args() -> Vec<String> {
+    let args: Vec<String> = env::args().collect();
+    let mut flagged: Option<&str> = None;
+    let res: Vec<String> = args[1..].iter().enumerate().map(|(n, arg)| {
+        if arg.starts_with("--") {
+            let flag = arg.split_at(2).1;
+            match flag {
+                "host" => {
+                    if let Some(val) = args.get(n+1) {
+                        flagged = Some(flag);
+                        println!("Host: {}", val)
+                    }
+                },
+                "port" => {
+                    if let Some(val) = args.get(n+1) {
+                        flagged = Some(flag);
+                        println!("Port: {}", val);
+                    }
+                },
+                "debug" => println!("Debug is on"),
+                "version" => println!("Version is on"),
+                "help" => println!("Help is on"),
+               _ => println!("No valid flag selected"),
+            }
+        } else if arg.starts_with("-") {
+            let flag = arg.split_at(1).1;
+            match flag {
+                "h" => {
+                    if let Some(val) = args.get(n+1) {
+                        flagged = Some(flag);
+                        println!("Host: {}", val);
+                    }
+                },
+                "p" => {
+                    if let Some(val) = args.get(n+1) {
+                        flagged = Some(flag);
+                        println!("Port: {}", val);
+                    }
+                },
+                "d" => { println!("Debug is on"); },
+                "v" => { println!("Version is on"); },
+                _ => println!("No valid option selected"),
+            }
+        } else if flagged.is_none() {
+            let cmd = args[n].as_str();
+            match cmd {
+                "help" => {println!("Help subcmd is on")},
+                "version" => { println!("Version subcmd is on") }
+                _ => println!("Invalid subcmd"),
+            }
+        }
+        arg.to_string()
+    }).collect();
+    res
+}
+
+
 fn main() -> io::Result<()> {
-    let addr = "0.0.0.0:7878";
+    let addr = "0.0.0.0:7879";
     let listener = TcpListener::bind(addr)?;
     log::info!("Server listening: {}{}", "http://", addr);
     let pool = ThreadPool::new(4).unwrap();
