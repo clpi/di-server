@@ -1,10 +1,23 @@
 [package]
-name = "srv"
+name = "dsrv"
 version = "0.1.0"
 authors = ["Chris P <chrisp1877@gmail.com>"]
 edition = "2018"
+default_run = "main"
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "main"
+path = "src/bin/main.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 log = "*"
+url = "*"
+crossbeam-channel = "*"
+
+[dev-dependencies]
+criterion = "*"

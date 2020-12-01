@@ -15,7 +15,7 @@ impl Args {
         let args: Vec<String> = env::args().collect();
         let mut flagged: Option<&str> = None;
         let mut out: Args = Args::default();
-        args[1..].iter().enumerate().for_each(|(n, arg)| {
+        args[1..].iter().zip(1..args.len()+1).for_each(|(arg, n)| {
             if arg.starts_with("--") {
                 let flag = arg.split_at(2).1;
                 match flag {
@@ -77,7 +77,7 @@ impl Args {
                     },
                 }
             } else if flagged.is_none() {
-                let cmd = args[n].as_str();
+                let cmd = arg.as_str();
                 match cmd {
                     "help" => {
                         out.help = true;
