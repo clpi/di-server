@@ -1,8 +1,6 @@
-use io::BufReader;
-
 use crate::cli::Args;
 use std::{
-    thread, io, net::{UdpSocket, SocketAddrV4},
+    thread, io, net::{UdpSocket, Ipv4Addr},
 };
 
 #[derive(Debug)]

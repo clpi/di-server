@@ -1,18 +1,34 @@
-use std::{env, net::SocketAddrV4};
+use std::{env, net::SocketAddrV4, fmt};
 
 #[derive(Debug, Clone)]
 pub struct Args {
     pub host: String,
     pub port: String,
     pub debug: bool,
-    protocol: Protocol,
+    run: HttpRun,
     help: bool,
     version: bool,
 }
 
 #[derive(Debug, Clone)]
 pub enum Protocol {
-    TCP, UDP
+    TCP, UDP,
+}
+
+impl From<&str> for Protocol {
+    fn from(kind: &str) -> Self {
+        match kind {
+            "tcp" | "TCP" => Protocol::TCP,
+            "udp" | "UDP" => Protocol::UDP,
+            _ => Protocol::TCP,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum HttpRun {
+    Server(Protocol),
+    Client(Protocol)
 }
 
 impl Args {
@@ -23,103 +39,60 @@ impl Args {
     }
 
     fn process_args(args: Vec<String>) -> Self {
-        let mut out: Args = Args::default();
         let mut flagged: Option<&str> = None;
-        args[1..].iter().zip(1..args.len()+1).for_each(|(arg, n)| {
-            if arg.starts_with("--") {
-                let flag = arg.split_at(2).1;
-                match flag {
-                    "host" => {
-                        if let Some(val) = args.get(n+1) {
-                            flagged = Some(flag);
-                            out.host = val.to_string(); //TODO validate
-                            println!("Host: {}", val)
-                        }
+        let mut out = Args::default();
+        args[1..].iter().zip(1..args.len()+1).fold(&mut out, |out, (arg, n)| {
+            let bool_flag = match arg.clone().as_str() {
+                "--debug" | "-d" => {
+                    out.debug = true;
+                    println!("Debug is on");
+                    true
+                },
+                "--version" | "-v" => {
+                    out.version = true;
+                    println!("Version is on");
+                    true
+                },
+                "--help" | "help" => {
+                    out.help = true;
+                    println!("Help is on");
+                    true
+                },
+               _ => false,
+            };
+            let val = args.get(n+1);
+            if val.is_some() && !bool_flag && flagged.is_none() {
+                let val = val.unwrap();
+                let (lev, input) = match arg[..2].split_at(1) {
+                    ("-", "-") => (2, &arg[2..]),
+                    ("-", _) => (1, &arg[1..]),
+                    _ => (0, arg.as_str())
+                };
+                flagged = Some(input);
+                match (lev, input)  { //TODO struct-ize this match arg
+                    (2, "host") | (1, "h")  => {
+                        out.host = val.into(); //TODO validate
+                        println!("Host: {}", val)
                     },
-                    "port" => {
-                        if let Some(val) = args.get(n+1) {
-                            flagged = Some(flag);
-                            out.port = val.to_string();
-                            println!("Port: {}", val);
-                        }
+                    (2, "port") | (1, "p")  => {
+                        out.port = val.into();
+                        println!("Port: {}", val);
                     },
-                    "debug" => {
-                        out.debug = true;
-                        println!("Debug is on");
+                    (2, "server") | (1, "s") | (0, "server") => {
+                        let protocol = Protocol::from(val.as_str());
+                        out.run = HttpRun::Server(protocol.clone());
+                        println!("Running {} server", protocol.clone());
                     },
-                    "version" => {
-                        out.version = true;
-                        println!("Version is on");
+                    (2, "client") | (1, "c") | (0, "client") => {
+                        let protocol = Protocol::from(val.as_str());
+                        out.run = HttpRun::Client(protocol.clone());
+                        println!("Running {} client", protocol);
                     },
-                    "help" => {
-                        out.help = true;
-                        println!("Help is on")
-                    },
-                    "udp" => {
-                        out.protocol = Protocol::UDP;
-                        println!("Protocol set to UDP")
-                    },
-                    "tcp" => println!("TCP is default"),
-                   _ => println!("No valid flag selected: {}", flag),
+                    _ => { eprintln!("Invalid flag or subcmd provided") }
                 }
-            } else if arg.starts_with("-") {
-                let flag = arg.split_at(1).1;
-                match flag {
-                    "h" => {
-                        if let Some(val) = args.get(n+1) {
-                            flagged = Some(flag);
-                            out.host = val.to_string();
-                            println!("Host: {}", val);
-                        }
-                    },
-                    "p" => {
-                        if let Some(val) = args.get(n+1) {
-                            flagged = Some(flag);
-                            out.port = val.to_string();
-                            println!("Port: {}", val);
-                        }
-                    },
-                    "d" => {
-                        out.debug = true;
-                        println!("Debug is on");
-                    },
-                    "v" => {
-                        out.version = true;
-                        println!("Version is on");
-                    },
-                    "u" => {
-                        out.protocol = Protocol::UDP;
-                        println!("Protocol set to UDP");
-                    },
-                    "t" => println!("TCP is default"),
-                    _ => {
-                        println!("No valid option selected: {}", flag)
-                    },
-                }
-            } else if flagged.is_none() {
-                let cmd = arg.as_str();
-                match cmd {
-                    "help" => {
-                        out.help = true;
-                        println!("Help subcmd is on")
-                    },
-                    "version" => {
-                        out.version = true;
-                        println!("Version subcmd is on")
-                    },
-                    "debug" => {
-                        out.debug = true;
-                        println!("Debug subcmd is on")
-                    },
-                    "udp" => {
-                        out.protocol = Protocol::UDP;
-                        println!("Debug subcmd is on")
-                    },
-                    _ => println!("Invalid subcmd: {}", cmd),
-                }
-            }
-        });
-        out
+            } else if flagged.is_some() { flagged = None }
+            out
+        }).to_owned()
     }
 
     pub fn get_addr(self) -> SocketAddrV4 {
@@ -140,9 +113,19 @@ impl Default for Args {
             debug: false,
             help: false,
             version: false,
-            protocol: Protocol::TCP,
+            run: HttpRun::Server(Protocol::UDP),
             host: String::from("127.0.0.1"),
             port: String::from("8080"),
         }
+    }
+}
+
+impl fmt::Display for Protocol {
+    fn fmt(&self, _: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let string = match self {
+            Protocol::UDP => print!("UDP"),
+            Protocol::TCP => print!("TCP")
+        };
+        Ok(())
     }
 }
