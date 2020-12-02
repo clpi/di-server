@@ -24,3 +24,9 @@ serde_json = "*"
 
 [dev-dependencies]
 criterion = "*"
+
+# [build-dependencies]
+# protoc-rust-grpc = "*"
+
+[profile.dev]
+opt="z"

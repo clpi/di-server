@@ -1,5 +1,11 @@
+pub mod header;
+pub mod cookie;
+pub mod method;
+
+pub use header::Headers;
 use std::convert::{Infallible, TryFrom};
 
+#[derive(Debug, Clone,)]
 pub enum Method {
     GET,
     POST,
@@ -7,6 +13,23 @@ pub enum Method {
     OPTIONS,
     HEAD,
     DELETE,
+}
+
+#[derive(Debug, Clone)]
+pub enum  HttpVersion {
+    V1_1, V2_0, V2_2
+}
+
+impl Default for HttpVersion {
+    fn default() -> Self {
+        HttpVersion::V1_1
+    }
+}
+
+impl Default for Method {
+    fn default() -> Self {
+        Self::GET
+    }
 }
 
 impl Method {

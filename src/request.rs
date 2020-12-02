@@ -1,11 +1,13 @@
 use std::fs;
+use crate::http::HttpVersion;
+
 use super::http::Method;
 
 #[derive(Debug, Clone, Default)]
 pub struct Request<'a> {
-    method: &'a str,
+    method: Method,
     uri: &'a str,
-    http: &'a str,
+    http_version: HttpVersion,
 }
 
 impl<'a> Request<'a> {
