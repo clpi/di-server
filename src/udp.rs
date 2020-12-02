@@ -1,10 +1,14 @@
 use crate::cli::Args;
 use std::{
-    thread, io, net::{UdpSocket, Ipv4Addr},
+    convert::TryFrom,
+    io,
+    net::{self,  UdpSocket, Ipv4Addr},
+    thread
 };
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct UdpServer {
+    multicast: Option<Ipv4Addr>,
     address: String,
     debug: bool,
 }
@@ -12,11 +16,20 @@ pub struct UdpServer {
 impl UdpServer {
 
     pub fn from_args() -> Self {
-        Self::from(Args::get())
+        Self::try_from(Args::get()).expect("Could not create UDP servere from args")
+    }
+
+    pub fn bind_wildcard() -> Self {
+        Self { address: "0.0.0.0".into(), ..Self::default() }
     }
 
     pub fn run(&self) -> io::Result<()> {
         let socket = UdpSocket::bind(self.address.as_str())?;
+        let wildcard = "0.0.0.0".parse::<Ipv4Addr>().unwrap();
+        if let Some(mc) = &self.multicast {
+            socket.join_multicast_v4(mc, &wildcard)
+                .expect("Could not join multicast");
+        }
         loop {
             let mut buf = [0u8; 1500];
             let udp_socket = socket.try_clone()?;
@@ -33,33 +46,45 @@ impl UdpServer {
     }
 }
 
-impl From<Args> for UdpServer {
-    fn from(args: Args) -> Self {
-        Self {
+impl TryFrom<Args> for UdpServer {
+    type Error = net::AddrParseError;
+    fn try_from(args: Args) -> Result<Self, Self::Error> {
+        Ok(Self {
             debug: args.debug,
-            address: args.get_addr_string(),
-        }
+            address: args.clone().get_addr_string(),
+            multicast: Some(args.get_multicast()?),
+        })
     }
 }
 
-impl From<Args> for UdpClient {
-    fn from(args: Args) -> Self {
-        Self { address: args.get_addr_string(), }
+impl TryFrom<Args> for UdpClient {
+    type Error = net::AddrParseError;
+    fn try_from(args: Args) -> Result<Self, Self::Error> {
+        Ok(Self {
+            address: args.clone().get_addr_string(),
+            multicast: Some(args.get_multicast()?),
+        })
     }
 }
 
 pub struct UdpClient {
-    address: String
+    address: String,
+    multicast: Option<Ipv4Addr>
 }
 
 impl UdpClient {
 
     pub fn from_args() -> Self {
-        Self::from(Args::get())
+        Self::try_from(Args::get()).expect("Could not get client from args")
     }
 
     pub fn connect(self, msg: Option<String>) -> io::Result<()> {
         let socket = UdpSocket::bind(self.address.as_str())?;
+        let wildcard = "0.0.0.0".parse::<Ipv4Addr>().unwrap();
+        if let Some(mc) = &self.multicast {
+            socket.join_multicast_v4(mc, &wildcard)
+                .expect("Could not join multicast");
+        }
         socket.connect(self.address.as_str())?;
         loop {
             let mut buf = [0u8; 1500];

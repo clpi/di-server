@@ -1,10 +1,11 @@
-use std::{env, net::SocketAddrV4, fmt};
+use std::{env, net::{self, Ipv4Addr, SocketAddrV4}, fmt};
 
 #[derive(Debug, Clone)]
 pub struct Args {
     pub host: String,
     pub port: String,
     pub debug: bool,
+    pub multicast: Option<String>,
     run: HttpRun,
     help: bool,
     version: bool,
@@ -78,6 +79,10 @@ impl Args {
                         out.port = val.into();
                         println!("Port: {}", val);
                     },
+                    (2, "multicast") | (1, "m")  => {
+                        out.multicast = Some(val.into());
+                        println!("Multicast: {}", val);
+                    },
                     (2, "server") | (1, "s") | (0, "server") => {
                         let protocol = Protocol::from(val.as_str());
                         out.run = HttpRun::Server(protocol.clone());
@@ -88,7 +93,10 @@ impl Args {
                         out.run = HttpRun::Client(protocol.clone());
                         println!("Running {} client", protocol);
                     },
-                    _ => { eprintln!("Invalid flag or subcmd provided") }
+                    _ => {
+                        eprintln!("Invalid flag or subcmd provided");
+                        std::process::exit(1);
+                    }
                 }
             } else if flagged.is_some() { flagged = None }
             out
@@ -99,7 +107,11 @@ impl Args {
         self.get_addr_string()
             .parse()
             .expect("Could not parse host and port into socket address")
+    }
 
+    pub fn get_multicast(self) -> Result<Ipv4Addr, net::AddrParseError> {
+        self.multicast.unwrap_or_default()
+            .parse::<Ipv4Addr>()
     }
 
     pub fn get_addr_string(self) -> String {
@@ -116,6 +128,7 @@ impl Default for Args {
             run: HttpRun::Server(Protocol::UDP),
             host: String::from("127.0.0.1"),
             port: String::from("8080"),
+            multicast: None,
         }
     }
 }
