@@ -7,11 +7,13 @@ use std::{
     convert::TryFrom,
     fs::read_to_string,
     io::{self, prelude::*},
-    net::{TcpListener, TcpStream}, thread, time::Duration};
+    net::{TcpListener, TcpStream, SocketAddrV4},
+    thread, time::Duration
+};
 
 #[derive(Debug)]
 pub struct Server {
-    address: String,
+    address: SocketAddrV4,
     debug: bool,
 }
 
@@ -27,13 +29,14 @@ impl Server {
         let pool = ThreadPool::new(4).unwrap();
         for stream in listener.incoming() {
             match stream {
-                Ok(stream) => pool.execute(|| {
-                    match Self::handle_conn(stream) {
+                Err(err) => { eprintln!("Error reading: {}", err); return Err(err) },
+                Ok(stream) => {
+                    stream.set_read_timeout(Some(Duration::from_secs(3)))?;
+                    stream.set_write_timeout(Some(Duration::from_secs(3)))?;
+                    pool.execute(|| match Self::handle_conn(stream) {
                         Ok(_) => log::info!("{}", "Handled stream"),
-                        Err(_) => log::error!("Could not handle stream"),
-                    }
-                }),
-                Err(err) => log::error!("Error reading: {}", err),
+                        Err(_) => eprintln!("Could not handle stream"),
+                })}
             }
         }
         Ok(())
@@ -61,11 +64,6 @@ impl Server {
         let delete = b"DELETE / HTTP/1.1\r\n";
         let sleep = b"GET /sleep HTTP/1.1\r\n";
 
-        match Self::method(&buf.split_first().unwrap().0.to_string()).unwrap() {
-            Method::GET => {},
-            Method::POST => {},
-            _ => {}
-        }
         let (status, file) = if buf.starts_with(get) {
             ("HTTP/1.1 200 OK\r\n\r\n", "static/index.html")
         } else if buf.starts_with(post) {
@@ -103,7 +101,7 @@ impl From<Args> for Server {
     fn from(args: Args) -> Self {
         Self {
             debug: args.debug,
-            address: format!("{}:{}", args.host, args.port),
+            address: args.get_addr(),
         }
     }
 }
