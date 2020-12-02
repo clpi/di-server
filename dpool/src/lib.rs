@@ -13,14 +13,15 @@ pub struct ThreadPool {
 type Job = Box<dyn FnOnce() + Send + 'static>;
 
 impl ThreadPool {
-    pub fn new(size: usize) -> Result<ThreadPool, PoolCreationError> {
-        if size <= 0 {
-            return Err(PoolCreationError::InvalidThreadNumber)
-        }
+    pub fn new(size: Option<usize>) -> Result<ThreadPool, PoolCreationError> {
+        let num_workers = if let Some(num) = size {
+            if num <= 0 { return Err(PoolCreationError::InvalidThreadNumber) }
+            num
+        } else { num_cpus::get() };
         let (snd, rcv) = unbounded();
         let rcv = Arc::new(Mutex::new(rcv));
-        let mut workers = Vec::with_capacity(size);
-        for id in 0..size {
+        let mut workers = Vec::with_capacity(num_workers);
+        for id in 0..num_workers {
             workers.push(Worker::new(id, Arc::clone(&rcv)));
         }
         Ok( Self { workers, snd } )

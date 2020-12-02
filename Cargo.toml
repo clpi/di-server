@@ -18,9 +18,10 @@ path = "src/bin/main.rs"
 log = "*"
 url = "*"
 crossbeam-channel = "*"
-ipnetwork = "*"
 serde = { version = "*", features = ["derive"] }
 serde_json = "*"
+futures = ""
+
 dpool = { path = "./dpool" }
 dargs = { path = "./dargs" }
 dhttp = { path = "./dhttp" }
