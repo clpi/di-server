@@ -1,4 +1,4 @@
-use super::{HttpRun, Protocol};
+use dhttp::{HttpRun, Protocol};
 use std::{env, net::{self, Ipv4Addr, SocketAddrV4}, fmt};
 
 #[derive(Debug, Clone)]
@@ -114,12 +114,10 @@ impl Default for Args {
     }
 }
 
-impl fmt::Display for Protocol {
-    fn fmt(&self, _: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let string = match self {
-            Protocol::UDP => print!("UDP"),
-            Protocol::TCP => print!("TCP")
-        };
-        Ok(())
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn it_works() {
+        assert_eq!(2 + 2, 4);
     }
 }

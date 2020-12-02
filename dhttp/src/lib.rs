@@ -3,7 +3,10 @@ pub mod cookie;
 pub mod method;
 
 pub use header::Headers;
-use std::convert::{Infallible, TryFrom};
+use std::{
+    convert::{Infallible, TryFrom},
+    fmt
+};
 
 #[derive(Debug, Clone,)]
 pub enum Method {
@@ -69,4 +72,41 @@ pub enum HttpRequest {
     DELETE,
     HEAD,
     NONE,
+}
+#[derive(Debug, Clone)]
+pub enum Protocol {
+    TCP, UDP,
+}
+
+impl From<&str> for Protocol {
+    fn from(kind: &str) -> Self {
+        match kind {
+            "tcp" | "TCP" => Protocol::TCP,
+            "udp" | "UDP" => Protocol::UDP,
+            _ => Protocol::TCP,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum HttpRun {
+    Server(Protocol),
+    Client(Protocol)
+}
+
+impl fmt::Display for Protocol {
+    fn fmt(&self, _: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let string = match self {
+            Protocol::UDP => print!("UDP"),
+            Protocol::TCP => print!("TCP")
+        };
+        Ok(())
+    }
+}
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn it_works() {
+        assert_eq!(2 + 2, 4);
+    }
 }

@@ -2,12 +2,10 @@ pub mod config;
 pub mod tcp;
 pub mod udp;
 
-use crate::{
-    HttpRun, Protocol,
-    pool::ThreadPool,
-    cli::Args,
-    http::Method,
-};
+use dpool::ThreadPool;
+
+use dargs::Args;
+use dhttp::{Method, HttpRun};
 use std::{
     convert::TryFrom,
     fs::read_to_string,

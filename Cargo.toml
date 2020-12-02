@@ -21,9 +21,13 @@ crossbeam-channel = "*"
 ipnetwork = "*"
 serde = { version = "*", features = ["derive"] }
 serde_json = "*"
+dpool = { path = "./dpool" }
+dargs = { path = "./dargs" }
+dhttp = { path = "./dhttp" }
 
 [dev-dependencies]
 criterion = "*"
+env_logger = "*"
 
 # [build-dependencies]
 # protoc-rust-grpc = "*"

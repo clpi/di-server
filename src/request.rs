@@ -1,7 +1,5 @@
 use std::fs;
-use crate::http::HttpVersion;
-
-use super::http::Method;
+use dhttp::{HttpVersion, Method};
 
 #[derive(Debug, Clone, Default)]
 pub struct Request<'a> {
