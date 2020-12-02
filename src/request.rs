@@ -1,4 +1,5 @@
 use std::fs;
+use super::http::Method;
 
 #[derive(Debug, Clone, Default)]
 pub struct Request<'a> {

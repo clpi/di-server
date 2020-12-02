@@ -1,3 +1,7 @@
+pub mod config;
+pub mod tcp;
+pub mod udp;
+
 use crate::{
     HttpRun, Protocol,
     pool::ThreadPool,
@@ -12,7 +16,6 @@ use std::{
     net::{self,  UdpSocket, Ipv4Addr},
     thread, time::Duration
 };
-use mio::Events;
 
 #[derive(Debug, Clone)]
 pub struct Server {

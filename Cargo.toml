@@ -17,9 +17,10 @@ path = "src/bin/main.rs"
 [dependencies]
 log = "*"
 url = "*"
-mio = "*"
 crossbeam-channel = "*"
 ipnetwork = "*"
+serde = { version = "*", features = ["derive"] }
+serde_json = "*"
 
 [dev-dependencies]
 criterion = "*"
