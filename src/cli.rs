@@ -1,3 +1,4 @@
+use super::{HttpRun, Protocol};
 use std::{env, net::{self, Ipv4Addr, SocketAddrV4}, fmt};
 
 #[derive(Debug, Clone)]
@@ -11,26 +12,6 @@ pub struct Args {
     version: bool,
 }
 
-#[derive(Debug, Clone)]
-pub enum Protocol {
-    TCP, UDP,
-}
-
-impl From<&str> for Protocol {
-    fn from(kind: &str) -> Self {
-        match kind {
-            "tcp" | "TCP" => Protocol::TCP,
-            "udp" | "UDP" => Protocol::UDP,
-            _ => Protocol::TCP,
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum HttpRun {
-    Server(Protocol),
-    Client(Protocol)
-}
 
 impl Args {
 

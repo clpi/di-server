@@ -38,3 +38,12 @@ impl Into<&str> for Method {
         }
     }
 }
+
+pub enum HttpRequest {
+    GET,
+    POST,
+    PUT,
+    DELETE,
+    HEAD,
+    NONE,
+}

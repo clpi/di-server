@@ -1,4 +1,5 @@
 use crate::{
+    HttpRun, Protocol,
     pool::ThreadPool,
     cli::Args,
     http::Method,
@@ -8,22 +9,25 @@ use std::{
     fs::read_to_string,
     io::{self, prelude::*},
     net::{TcpListener, TcpStream, SocketAddrV4},
+    net::{self,  UdpSocket, Ipv4Addr},
     thread, time::Duration
 };
+use mio::Events;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Server {
-    address: SocketAddrV4,
+    multicast: Option<Ipv4Addr>,
+    address: String,
     debug: bool,
 }
 
 impl Server {
 
     pub fn new() -> Self {
-        Self::from(Args::get())
+        Self::try_from(Args::get()).expect("Could not parse args to TCP server")
     }
 
-    pub fn run(self) -> io::Result<()> {
+    pub fn run(&mut self) -> io::Result<()> {
         let listener = TcpListener::bind(&self.address)?;
         log::info!("Server listening: {}{}", "http://", self.address);
         let pool = ThreadPool::new(4).unwrap();
@@ -87,8 +91,9 @@ impl Server {
     }
 
     pub fn parse_req(line: &str) -> Result<String, Box<dyn std::error::Error>> {
-        let method = line.split(" ").next().ok_or("Method not specified")?;
-        let method = Method::try_from(method)?;
+        if let Some(line) = line.split(" ").next() {
+            let method = Method::try_from(line)?;
+        }
         Ok(line.to_string())
     }
 
@@ -97,22 +102,64 @@ impl Server {
     }
 }
 
-impl From<Args> for Server {
-    fn from(args: Args) -> Self {
-        Self {
+impl TryFrom<Args> for Server {
+    type Error = net::AddrParseError;
+    fn try_from(args: Args) -> Result<Self, Self::Error> {
+        Ok(Self {
             debug: args.debug,
-            address: args.get_addr(),
+            address: args.clone().get_addr_string(),
+            multicast: None,
+        })
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct UdpServer {
+    multicast: Option<Ipv4Addr>,
+    address: String,
+    debug: bool,
+}
+
+impl UdpServer {
+
+    pub fn from_args() -> Self {
+        Self::try_from(Args::get()).expect("Could not create UDP servere from args")
+    }
+
+    pub fn bind_wildcard() -> Self {
+        Self { address: "0.0.0.0".into(), ..Self::default() }
+    }
+
+    pub fn run(&self) -> io::Result<()> {
+        let socket = UdpSocket::bind(self.address.as_str())?;
+        let wildcard = "0.0.0.0".parse::<Ipv4Addr>().unwrap();
+        if let Some(mc) = &self.multicast {
+            socket.join_multicast_v4(mc, &wildcard)
+                .expect("Could not join multicast");
+        }
+        loop {
+            let mut buf = [0u8; 1500];
+            let udp_socket = socket.try_clone()?;
+            match udp_socket.recv_from(&mut buf) {
+                Ok((_, src)) => {
+                    thread::spawn(move || {
+                        println!("Handling connection from {}", src);
+                        udp_socket.send_to(&buf, &src)
+                    });
+                },
+                Err(e) => eprintln!("Couldn't receive data: {}", e),
+            }
         }
     }
 }
 
-pub enum HttpRequest {
-    GET,
-    POST,
-    PUT,
-    DELETE,
-    HEAD,
-    NONE,
+impl TryFrom<Args> for UdpServer {
+    type Error = net::AddrParseError;
+    fn try_from(args: Args) -> Result<Self, Self::Error> {
+        Ok(Self {
+            debug: args.debug,
+            address: args.clone().get_addr_string(),
+            multicast: None,
+        })
+    }
 }
-
-

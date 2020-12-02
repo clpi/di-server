@@ -1,5 +1,5 @@
 use std::io;
-use dsrv::tcp::Server;
+use dsrv::server::Server;
 
 fn main() -> io::Result<()> {
     Server::new().run()

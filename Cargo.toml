@@ -17,7 +17,9 @@ path = "src/bin/main.rs"
 [dependencies]
 log = "*"
 url = "*"
+mio = "*"
 crossbeam-channel = "*"
+ipnetwork = "*"
 
 [dev-dependencies]
 criterion = "*"
