@@ -3,14 +3,14 @@ name = "dsrv"
 version = "0.1.0"
 authors = ["Chris P <chrisp1877@gmail.com>"]
 edition = "2018"
-default_run = "main"
+default_run = "server"
 
 [lib]
 path = "src/lib.rs"
 
 [[bin]]
-name = "main"
-path = "src/bin/main.rs"
+name = "server"
+path = "src/bin/server.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -19,14 +19,13 @@ slog = "*"
 slog-term = "*"
 slog-async = "*"
 url = "*"
-crossbeam-channel = "*"
 serde = { version = "*", features = ["derive"] }
 serde_json = "*"
 futures = ""
 
-dpool = { path = "./dpool" }
-dargs = { path = "./dargs" }
-dhttp = { path = "./dhttp" }
+dpool = { path = "./crates/dpool" }
+dargs = { path = "./crates/dargs" }
+dhttp = { path = "./crates/dhttp" }
 
 [dev-dependencies]
 criterion = "*"

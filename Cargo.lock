@@ -305,7 +305,6 @@ dependencies = [
 name = "dpool"
 version = "0.1.0"
 dependencies = [
- "crossbeam-channel 0.5.0",
  "num_cpus",
 ]
 
@@ -314,7 +313,6 @@ name = "dsrv"
 version = "0.1.0"
 dependencies = [
  "criterion",
- "crossbeam-channel 0.5.0",
  "dargs",
  "dhttp",
  "dpool",

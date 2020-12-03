@@ -1,6 +1,4 @@
 pub mod config;
-pub mod tcp;
-pub mod udp;
 
 use dargs::Args;
 use std::{
@@ -46,5 +44,13 @@ impl UdpClient {
             print!("{}",  String::from_utf8(buf.to_vec())
                 .expect("Could not write buffer as string"));
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn it_works() {
+        assert_eq!(2 + 2, 4);
     }
 }

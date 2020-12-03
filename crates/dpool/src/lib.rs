@@ -1,13 +1,18 @@
-use crossbeam_channel::{Sender, Receiver, unbounded};
+// use crossbeam_channel::{Sender, Receiver, unbounded};
 use std::{
-    thread::{self, JoinHandle},
-    io, sync::{mpsc, Arc, Mutex},
-    rc,
-};
+    time::Duration,
+    collections::HashMap,
+    io, rc,
+    sync::{
+        mpsc::{Sender, Receiver, self},
+        atomic::{AtomicUsize, Ordering},
+        Arc, Mutex,
+    },
+    thread::{self, JoinHandle}};
 
 pub struct ThreadPool {
     workers: Vec<Worker>,
-    snd: Sender<Message>,
+    snd: Sender<Msg>,
 }
 
 type Job = Box<dyn FnOnce() + Send + 'static>;
@@ -18,7 +23,8 @@ impl ThreadPool {
             if num <= 0 { return Err(PoolCreationError::InvalidThreadNumber) }
             num
         } else { num_cpus::get() };
-        let (snd, rcv) = unbounded();
+        // let (snd, rcv) = unbounded();
+        let (snd, rcv): (Sender<Msg>, Receiver<Msg>) = mpsc::channel();
         let rcv = Arc::new(Mutex::new(rcv));
         let mut workers = Vec::with_capacity(num_workers);
         for id in 0..num_workers {
@@ -32,15 +38,24 @@ impl ThreadPool {
             F: FnOnce() + Send + 'static,
     {
         let job = Box::new(f);
-        self.snd.send(Message::NewJob(job)).unwrap();
+        self.snd.send(Msg::NewJob(job)).unwrap();
+    }
+
+    fn timer(send: mpsc::SyncSender<Msg>) -> io::Result<()> {
+        let mut pulse = 0;
+        loop {
+            thread::sleep(Duration::from_secs(1));
+            send.send(Msg::Pulse(pulse)).expect("Could not send pulse");
+            pulse += 1;
+        }
     }
 }
 
 impl Drop for ThreadPool {
     fn drop(&mut self) {
-        println!("Sending terminate message to all workers");
+        println!("Sending terminate Msg to all workers");
         for _ in &self.workers {
-            self.snd.send(Message::Terminate).unwrap();
+            self.snd.send(Msg::Terminate).unwrap();
         }
         for worker in &mut self.workers {
             println!("Shutting down worker {}.", worker.id);
@@ -62,29 +77,34 @@ struct Worker {
 }
 
 impl Worker {
-    fn new(id: usize, rcv: Arc<Mutex<Receiver<Message>>>) -> Self {
-        let work_thread = thread::spawn(move || {
+    fn new(id: usize, rcv: Arc<Mutex<Receiver<Msg>>>) -> Self {
+        let work_thread = thread::Builder::new()
+            .name(format!("worker {}", id))
+            .spawn(move || {
             while let Ok(msg) = rcv.lock().unwrap().recv() {
                 match msg {
-                    Message::NewJob(job) => {
+                    Msg::NewJob(job) => {
                         println!("Worker {} got a job, executing...", id);
                         job()
                     },
-                    Message::Terminate => {
+                    Msg::Terminate => {
                         println!("Worker {} told to terminate", id);
                         break;
                     }
+                    _ => {  }
                 }
             }
-        });
+        }).expect("Could not create thread");
         Self { id, thread: Some(work_thread) }
     }
 }
 
-enum Message {
+enum Msg {
     NewJob(Job),
     Terminate,
+    Pulse(u16),
 }
+
 #[cfg(test)]
 mod tests {
     #[test]
