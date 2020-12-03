@@ -12,6 +12,11 @@ path = "src/lib.rs"
 name = "server"
 path = "src/bin/server.rs"
 
+[[bench]]
+name = "server"
+harness = false
+path = "benches/server.rs"
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
@@ -21,7 +26,9 @@ slog-async = "*"
 url = "*"
 serde = { version = "*", features = ["derive"] }
 serde_json = "*"
-futures = ""
+chrono = "*"
+futures-util = "*"
+
 
 dpool = { path = "./crates/dpool" }
 dargs = { path = "./crates/dargs" }

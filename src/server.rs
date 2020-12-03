@@ -27,22 +27,33 @@ impl Server {
         Self::try_from(Args::get()).expect("Could not parse args to TCP server")
     }
 
+    pub fn accept(n: u8) -> io::Result<()> {
+        Ok(())
+    }
+
     pub fn run(&mut self) -> io::Result<()> {
         let listener = TcpListener::bind(&self.address)?;
         println!("Server listening: {}{}", "http://", self.address);
         let pool = ThreadPool::new(Some(4)).unwrap();
         for stream in listener.incoming() {
             match stream {
-                Err(err) => { eprintln!("Error reading: {}", err); return Err(err) },
-                Ok(stream) => {
-                    stream.set_read_timeout(Some(Duration::from_secs(3)))?;
-                    stream.set_write_timeout(Some(Duration::from_secs(3)))?;
-                    pool.execute(|| match Self::handle_conn(stream) {
-                        Ok(_) => println!("{}", "Handled stream"),
-                        Err(_) => eprintln!("Could not handle stream"),
-                })}
+                Err(err) => {
+                    eprintln!("Error reading: {}", err);
+                    return Err(err);
+                },
+                Ok(stream) => self.handle_stream(&pool, stream)?,
             }
         }
+        Ok(())
+    }
+
+    pub fn handle_stream(&mut self, pool: &ThreadPool, mut stream: TcpStream) -> io::Result<()> {
+        stream.set_read_timeout(Some(Duration::from_secs(3)))?;
+        stream.set_write_timeout(Some(Duration::from_secs(3)))?;
+        pool.execute(|| match Self::handle_conn(stream) {
+            Ok(_) => println!("{}", "Handled stream"),
+            Err(_) => eprintln!("Could not handle stream"),
+        });
         Ok(())
     }
 
@@ -84,17 +95,19 @@ impl Server {
         let res = format!("{}{}", status, file);
         stream.write(res.as_bytes())?;
         stream.flush()?;
-
-        stream.write(res.as_bytes())?;
-        stream.flush()?;
         Ok(())
     }
 
     pub fn parse_req(line: &str) -> Result<String, Box<dyn std::error::Error>> {
-        if let Some(line) = line.split(" ").next() {
+        let mut num = 0;
+        while let Some(line) = line.split(" ").next() {
             let method = Method::try_from(line)?;
         }
         Ok(line.to_string())
+    }
+
+    pub fn parse_method(inp: &str) -> String {
+        String::new()
     }
 
     pub fn method(word: &str) -> Result<Method, Box<dyn std::error::Error>> {
