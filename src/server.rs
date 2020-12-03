@@ -29,8 +29,8 @@ impl Server {
 
     pub fn run(&mut self) -> io::Result<()> {
         let listener = TcpListener::bind(&self.address)?;
-        log::info!("Server listening: {}{}", "http://", self.address);
-        let pool = ThreadPool::new(4).unwrap();
+        println!("Server listening: {}{}", "http://", self.address);
+        let pool = ThreadPool::new(Some(4)).unwrap();
         for stream in listener.incoming() {
             match stream {
                 Err(err) => { eprintln!("Error reading: {}", err); return Err(err) },
@@ -38,7 +38,7 @@ impl Server {
                     stream.set_read_timeout(Some(Duration::from_secs(3)))?;
                     stream.set_write_timeout(Some(Duration::from_secs(3)))?;
                     pool.execute(|| match Self::handle_conn(stream) {
-                        Ok(_) => log::info!("{}", "Handled stream"),
+                        Ok(_) => println!("{}", "Handled stream"),
                         Err(_) => eprintln!("Could not handle stream"),
                 })}
             }
@@ -51,11 +51,11 @@ impl Server {
         let mut buf = [0; 1024];
         stream.read(&mut buf)?;
         let req = String::from_utf8_lossy(&buf[..]);
-        log::info!("Request: {}", req);
+        println!("Request: {}", req);
         if let Some(req_line) = req.lines().next() {
             match Self::parse_req(req_line) {
-                Ok(req) => log::info!("Request: {}", req),
-                Err(err) => log::error!("Bad request: {}", err),
+                Ok(req) => println!("Request: {}", req),
+                Err(err) => eprintln!("Bad request: {}", err),
             }
         }
         Self::process_req(stream, buf)?;
