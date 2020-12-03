@@ -20,14 +20,14 @@ path = "benches/server.rs"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-slog = "*"
-slog-term = "*"
-slog-async = "*"
+log = "*"
 url = "*"
+bytes = "*"
 serde = { version = "*", features = ["derive"] }
 serde_json = "*"
 chrono = "*"
 futures-util = "*"
+lazy_static = "*"
 
 
 dpool = { path = "./crates/dpool" }

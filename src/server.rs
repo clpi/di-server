@@ -11,8 +11,14 @@ use std::{
     fs::read_to_string,
     io::{self, prelude::*},
     net::{self, Ipv4Addr, UdpSocket, TcpListener, TcpStream},
+    // collections::HashMap,
+    // sync::Mutex,
     thread, time::Duration
 };
+
+// lazy_static::lazy_static!{
+//     static ref IN_MEM: Mutex<HashMap<String, String>>;
+// };
 
 #[derive(Debug, Clone)]
 pub struct Server {
@@ -24,6 +30,7 @@ pub struct Server {
 impl Server {
 
     pub fn new() -> Self {
+        log::debug!("Logging initiated");
         Self::try_from(Args::get()).expect("Could not parse args to TCP server")
     }
 
@@ -31,10 +38,12 @@ impl Server {
         Ok(())
     }
 
-    pub fn run(&mut self) -> io::Result<()> {
+    pub fn run(&mut self, accept: Option<usize>) -> io::Result<()> {
         let listener = TcpListener::bind(&self.address)?;
         println!("Server listening: {}{}", "http://", self.address);
         let pool = ThreadPool::new(Some(4)).unwrap();
+        let serv = listener.incoming();
+        //if let Some(num) = accept { serv = serv.take(num) };
         for stream in listener.incoming() {
             match stream {
                 Err(err) => {
