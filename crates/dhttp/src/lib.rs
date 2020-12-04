@@ -2,65 +2,56 @@ pub mod header;
 pub mod cookie;
 pub mod method;
 
+pub use method::Method;
 pub use header::Headers;
+pub use cookie::Cookie;
+
 use std::{
     convert::{Infallible, TryFrom},
     fmt
 };
 
-#[derive(Debug, Clone,)]
-pub enum Method {
-    GET,
-    POST,
-    PUT,
-    OPTIONS,
-    HEAD,
-    DELETE,
+#[derive(Debug, Clone, Copy)]
+pub enum HttpParseError {
+    InvalidVersion,
+    InvalidMethod,
+    InvalidRoute,
 }
 
-#[derive(Debug, Clone)]
-pub enum  HttpVersion {
+#[derive(Debug, Clone, Copy)]
+pub enum Version {
     V1_1, V2_0, V2_2
 }
 
-impl Default for HttpVersion {
+impl Default for Version {
     fn default() -> Self {
-        HttpVersion::V1_1
+        Version::V1_1
     }
 }
 
-impl Default for Method {
-    fn default() -> Self {
-        Self::GET
+impl TryFrom<String> for Version {
+
+    type Error = HttpParseError;
+
+    fn try_from(version: String)
+        -> Result<Self, HttpParseError>
+    {
+        let vers = match version.as_str() {
+            "HTTP/1.1" => Self::V1_1,
+            "HTTP/2.0" => Self::V2_0,
+            "HTTP/2.2" => Self::V2_2,
+            _ => { return Err(HttpParseError::InvalidVersion); }
+        };
+        Ok(vers)
     }
 }
 
-impl Method {
-}
-
-impl TryFrom<&str> for Method {
-    type Error = String;
-    fn try_from(word: &str) -> Result<Self, Self::Error> {
-        match word {
-            "GET" => Ok(Self::GET),
-            "POST" => Ok(Self::POST),
-            "PUT" => Ok(Self::PUT),
-            "DELETE" => Ok(Self::DELETE),
-            "HEAD" => Ok(Self::HEAD),
-            _ => Err(format!("Invalid method: {}", word)),
-        }
-    }
-}
-
-impl Into<&str> for Method {
-    fn into(self) -> &'static str {
+impl<'a> Into<&'a str> for Version {
+    fn into(self) -> &'a str {
         match self {
-            Self::GET => "GET",
-            Self::POST => "POST",
-            Self::PUT => "PUT",
-            Self::DELETE => "DELETE",
-            Self::HEAD => "HEAD",
-            _ => "NONE",
+            Self::V1_1 => "HTTP/1.1",
+            Self::V2_0 => "HTTP/2.0",
+            Self::V2_2 => "HTTP/2.2",
         }
     }
 }

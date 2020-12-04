@@ -1,3 +1,6 @@
+use std::collections::HashMap;
+
+#[derive(Debug, Clone)]
 pub enum Headers {
     Connection,
     KeepAlive,
@@ -11,8 +14,10 @@ pub enum Headers {
     AccessControlAllowOrigin(String),
 }
 
-pub struct Header;
+#[derive(Debug, Clone)]
+pub struct Header(HashMap<String, String>);
 
+#[derive(Debug, Clone)]
 pub enum ContentType {
     TextHtml,
     ApplicationJson

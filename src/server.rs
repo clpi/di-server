@@ -3,86 +3,106 @@ pub mod state;
 pub mod tcp;
 pub mod udp;
 
-use dpool::ThreadPool;
+use dpool::{PoolCreationError, ThreadPool};
 use dargs::Args;
 use dhttp::{Method, HttpRun};
 use std::{
     convert::TryFrom,
     fs::read_to_string,
     io::{self, prelude::*},
-    net::{self, Ipv4Addr, UdpSocket, TcpListener, TcpStream},
-    // collections::HashMap,
-    // sync::Mutex,
+    net::{self, Ipv4Addr, Shutdown, Incoming, UdpSocket, TcpListener, TcpStream},
+    collections::HashMap,
+    sync::Mutex,
     thread, time::Duration
 };
+use super::{
+    route::{Route, Router},
+    request::Request,
+    response::Response,
+};
 
-// lazy_static::lazy_static!{
-//     static ref IN_MEM: Mutex<HashMap<String, String>>;
-// };
+lazy_static::lazy_static!{
+    static ref IN_MEM: Mutex<HashMap<String, String>> =
+        Mutex::new(HashMap::new());
+}
+
+static LOGGER: ServerLogger = ServerLogger;
+
+pub struct ServerLogger;
+
+impl log::Log for ServerLogger {
+    fn enabled(&self, metadata: &log::Metadata) -> bool {
+        metadata.level() <= log::Level::Info
+    }
+
+    fn log(&self, record: &log::Record) {
+        if self.enabled(record.metadata()) {
+            println!("{} - {}", record.level(), record.args());
+        }
+    }
+
+    fn flush(&self) {}
+}
 
 #[derive(Debug, Clone)]
 pub struct Server {
     multicast: Option<Ipv4Addr>,
     address: String,
     debug: bool,
+    router: Router,
 }
 
 impl Server {
 
     pub fn new() -> Self {
+        log::set_logger(&LOGGER)
+            .map(|()| log::set_max_level(log::LevelFilter::Info))
+            .expect("Could not set logger");
         log::debug!("Logging initiated");
         Self::try_from(Args::get()).expect("Could not parse args to TCP server")
     }
 
-    pub fn accept(n: u8) -> io::Result<()> {
-        Ok(())
-    }
-
-    pub fn run(&mut self, accept: Option<usize>) -> io::Result<()> {
+    pub fn run(&mut self, n_thr: Option<usize>) -> io::Result<()> {
         let listener = TcpListener::bind(&self.address)?;
         println!("Server listening: {}{}", "http://", self.address);
-        let pool = ThreadPool::new(Some(4)).unwrap();
-        let serv = listener.incoming();
-        //if let Some(num) = accept { serv = serv.take(num) };
-        for stream in listener.incoming() {
+        let pool = ThreadPool::new(n_thr)
+            .expect("Could not establish thread pool");
+        let srv = listener.incoming();
+        for (n, stream) in srv.enumerate() {
             match stream {
                 Err(err) => {
-                    eprintln!("Error reading: {}", err);
+                    eprintln!("Error reading req {}: {}", n, err);
                     return Err(err);
                 },
-                Ok(stream) => self.handle_stream(&pool, stream)?,
+                Ok(stream) => {
+                    stream.set_read_timeout(Some(Duration::from_secs(3)))?;
+                    stream.set_write_timeout(Some(Duration::from_secs(3)))?;
+                    pool.execute(|| match Self::handle_conn(stream) {
+                        Ok(res) => println!("{}: {}", res, "Handled stream"),
+                        Err(_) => eprintln!("Could not handle stream"),
+                    });
+                },
             }
         }
         Ok(())
     }
 
-    pub fn handle_stream(&mut self, pool: &ThreadPool, mut stream: TcpStream) -> io::Result<()> {
-        stream.set_read_timeout(Some(Duration::from_secs(3)))?;
-        stream.set_write_timeout(Some(Duration::from_secs(3)))?;
-        pool.execute(|| match Self::handle_conn(stream) {
-            Ok(_) => println!("{}", "Handled stream"),
-            Err(_) => eprintln!("Could not handle stream"),
-        });
-        Ok(())
-    }
-
-    fn handle_conn(mut stream: TcpStream) -> io::Result<()> {
+    fn handle_conn(mut stream: TcpStream) -> io::Result<String> {
         println!("Connected to {}", stream.local_addr()?);
         let mut buf = [0; 1024];
         stream.read(&mut buf)?;
         let req = String::from_utf8_lossy(&buf[..]);
         println!("Request: {}", req);
         if let Some(req_line) = req.lines().next() {
-            match Self::parse_req(req_line) {
-                Ok(req) => println!("Request: {}", req),
+            match Self::parse_req_line(req_line) {
+                Ok(req) => println!("Request: {:?}", req),
                 Err(err) => eprintln!("Bad request: {}", err),
             }
         }
-        Self::process_req(stream, buf)?;
-        Ok(())
+        Self::process_req(stream, buf)
     }
 
-    pub fn process_req(mut stream: TcpStream, buf: [u8; 1024]) -> io::Result<()> {
+    pub fn process_req(mut stream: TcpStream, buf: [u8; 1024]) -> io::Result<String> {
         let get = b"GET / HTTP/1.1\r\n";
         let post = b"POST / HTTP/1.1\r\n";
         let delete = b"DELETE / HTTP/1.1\r\n";
@@ -104,15 +124,38 @@ impl Server {
         let res = format!("{}{}", status, file);
         stream.write(res.as_bytes())?;
         stream.flush()?;
-        Ok(())
+        Ok(res)
     }
 
-    pub fn parse_req(line: &str) -> Result<String, Box<dyn std::error::Error>> {
-        let mut num = 0;
-        while let Some(line) = line.split(" ").next() {
-            let method = Method::try_from(line)?;
+    pub fn parse_req_line(line: &str)
+        -> Result<Request<String>, Box<dyn std::error::Error>> {
+        let (mut route, mut method, mut version):
+            (Route, dhttp::Method, dhttp::Version)
+             = (Route::default(), Method::default(),
+                 dhttp::Version::default());
+        while let Some((idx, line)) = line.split(" ").enumerate().next() {
+            let res = match (idx, line) {
+                (0, method_str) => {
+                    method = Method::try_from(method_str)?;
+                },
+                (1, route_str) => {
+                    route = Route::try_from(route_str.to_string())
+                        .expect("Could not parse route");
+                },
+                (2, vers_str) => {
+                    version = dhttp::Version::try_from(vers_str.to_string())
+                        .expect("Could not parse HTTP version");
+                },
+                (_, _) => {},
+            };
         }
-        Ok(line.to_string())
+        Ok(Request {
+            headers: Vec::new(),
+            method,
+            route,
+            http_version: version,
+            body: String::new(),
+        })
     }
 
     pub fn parse_method(inp: &str) -> String {
@@ -122,12 +165,23 @@ impl Server {
     pub fn method(word: &str) -> Result<Method, Box<dyn std::error::Error>> {
         Ok(Method::try_from(word)?)
     }
+
+    pub fn shutdown(cmd: &str) -> Result<(), io::Error> {
+        Ok(())
+    }
+}
+
+impl Drop for Server {
+    fn drop(&mut self) {
+
+    }
 }
 
 impl TryFrom<Args> for Server {
     type Error = net::AddrParseError;
     fn try_from(args: Args) -> Result<Self, Self::Error> {
         Ok(Self {
+            router: Router::default(),
             debug: args.debug,
             address: args.clone().get_addr_string(),
             multicast: None,
