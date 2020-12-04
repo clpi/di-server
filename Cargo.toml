@@ -29,6 +29,7 @@ serde_json = "*"
 chrono = "*"
 futures-util = "*"
 lazy_static = "*"
+async-std = { version = "*", features = ["attributes"] }
 
 
 dpool = { path = "./crates/dpool" }

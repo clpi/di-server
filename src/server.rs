@@ -3,6 +3,7 @@ pub mod state;
 pub mod tcp;
 pub mod udp;
 
+use async_std::net::ToSocketAddrs;
 use dpool::{PoolCreationError, ThreadPool};
 use dargs::Args;
 use dhttp::{Method, HttpRun};
@@ -66,7 +67,7 @@ impl Server {
         let listener = TcpListener::bind(&self.address)?;
         println!("Server listening: {}{}", "http://", self.address);
         let pool = ThreadPool::new(n_thr)
-            .expect("Could not establish thread pool");
+        .expect("Could not establish thread pool");
         let srv = listener.incoming();
         for (n, stream) in srv.enumerate() {
             match stream {
@@ -77,7 +78,7 @@ impl Server {
                 Ok(stream) => {
                     stream.set_read_timeout(Some(Duration::from_secs(3)))?;
                     stream.set_write_timeout(Some(Duration::from_secs(3)))?;
-                    pool.execute(|| match Self::handle_conn(stream) {
+                    pool.execute(|| match Self::handle_conn(stream, false) {
                         Ok(res) => println!("{}: {}", res, "Handled stream"),
                         Err(_) => eprintln!("Could not handle stream"),
                     });
@@ -87,16 +88,21 @@ impl Server {
         Ok(())
     }
 
-    fn handle_conn(mut stream: TcpStream) -> io::Result<String> {
+    /// Handle the TCP stream and parse the request line
+    /// (note: should parse by default, adding as param for dev)
+    fn handle_conn(mut stream: TcpStream, parse_req: bool) -> io::Result<String> {
         println!("Connected to {}", stream.local_addr()?);
         let mut buf = [0; 1024];
         stream.read(&mut buf)?;
         let req = String::from_utf8_lossy(&buf[..]);
         println!("Request: {}", req);
         if let Some(req_line) = req.lines().next() {
-            match Self::parse_req_line(req_line) {
-                Ok(req) => println!("Request: {:?}", req),
-                Err(err) => eprintln!("Bad request: {}", err),
+            println!("Req: {}", req_line);
+            if parse_req {
+                match Self::parse_req_line(req_line) {
+                    Ok(req) => println!("Request: {:?}", req),
+                    Err(err) => eprintln!("Bad request: {}", err),
+                }
             }
         }
         Self::process_req(stream, buf)
