@@ -50,6 +50,7 @@ pub struct Server {
     multicast: Option<Ipv4Addr>,
     address: String,
     debug: bool,
+    async_run: bool,
     router: Router,
 }
 
@@ -63,12 +64,19 @@ impl Server {
         Self::try_from(Args::get()).expect("Could not parse args to TCP server")
     }
 
-    pub async fn init(n_threads: Option<usize>) -> async_std::io::Result<()> {
-        Self::try_from(Args::get()).expect("Could not parse args to server")
-            .listen(n_threads).await
+    pub fn run(mut self, n_threads: Option<usize>) -> io::Result<()> {
+        if self.async_run {
+            async_std::task::block_on(self.run_async(n_threads))
+        } else {
+            self.run_sync(n_threads)
+        }
     }
 
-    pub async fn listen(mut self, n_threads: Option<usize>) -> async_std::io::Result<()> {
+    pub async fn run_async(self, n_threads: Option<usize>) -> async_std::io::Result<()> {
+        self.listen(n_threads).await
+    }
+
+    pub async fn listen(self, n_threads: Option<usize>) -> async_std::io::Result<()> {
         use async_std::{prelude::*, task};
         println!("Server listening (async): {}{}", "http://", self.address);
         let listener = async_std::net::TcpListener::bind(&self.address).await?;
@@ -101,7 +109,7 @@ impl Server {
         Ok(res)
     }
 
-    pub fn run(&mut self, n_thr: Option<usize>) -> io::Result<()> {
+    pub fn run_sync(&mut self, n_thr: Option<usize>) -> io::Result<()> {
         let listener = TcpListener::bind(&self.address)?;
         println!("Server listening: {}{}", "http://", self.address);
         let pool = ThreadPool::new(n_thr)
@@ -218,7 +226,6 @@ impl Server {
 
 impl Drop for Server {
     fn drop(&mut self) {
-
     }
 }
 
@@ -227,6 +234,7 @@ impl TryFrom<Args> for Server {
     fn try_from(args: Args) -> Result<Self, Self::Error> {
         Ok(Self {
             router: Router::default(),
+            async_run: args.async_run,
             debug: args.debug,
             address: args.clone().get_addr_string(),
             multicast: None,

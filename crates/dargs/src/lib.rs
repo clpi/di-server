@@ -5,6 +5,8 @@ pub mod args;
 use dhttp::{HttpRun, Protocol};
 use std::{env, net::{self, Ipv4Addr, SocketAddrV4}, fmt};
 
+//TODO Generalize this for any sort of input args
+/// Represents CLI arguments parsed into a struct for running the server
 #[derive(Debug, Clone)]
 pub struct Args {
     pub host: String,
@@ -14,6 +16,7 @@ pub struct Args {
     run: HttpRun,
     help: bool,
     version: bool,
+    pub async_run: bool,
 }
 
 
@@ -44,6 +47,11 @@ impl Args {
                     println!("Help is on");
                     true
                 },
+                "--async" | "-a" => {
+                    out.async_run = true;
+                    println!("Async is on");
+                    true
+                }
                _ => false,
             };
             let val = args.get(n+1);
@@ -110,6 +118,7 @@ impl Default for Args {
             debug: false,
             help: false,
             version: false,
+            async_run: false,
             run: HttpRun::Server(Protocol::UDP),
             host: String::from("127.0.0.1"),
             port: String::from("8080"),
