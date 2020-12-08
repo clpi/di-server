@@ -63,6 +63,39 @@ impl Server {
         Self::try_from(Args::get()).expect("Could not parse args to TCP server")
     }
 
+    pub async fn init(n_threads: Option<usize>) -> async_std::io::Result<()> {
+        Self::try_from(Args::get()).expect("Could not parse args to server")
+            .listen(n_threads).await
+    }
+
+    pub async fn listen(mut self, n_threads: Option<usize>) -> async_std::io::Result<()> {
+        use async_std::prelude::*;
+        let listener = async_std::net::TcpListener::bind(&self.address).await?;
+        let mut incoming = listener.incoming();
+        while let Some(stream) = incoming.next().await {
+            let stream = stream?;
+            println!("Accepting from: {}", stream.peer_addr()?);
+            let _handle = async_std::task::spawn(Self::listen_stream(stream)); // 1
+        }
+        // self.run(n_threads)?;
+        Ok(())
+    }
+
+    pub async fn listen_stream(mut stream: async_std::net::TcpStream) -> async_std::io::Result<String> {
+        use async_std::prelude::*;
+        let reader = async_std::io::BufReader::new(&stream); // 2
+        let mut lines = reader.lines();
+        let buf = [0; 1024];
+        let request = match lines.next().await {
+            None => return Err(async_std::io::ErrorKind::ConnectionAborted.into()),
+            Some(line) => println!("request: {:?}", line?),
+        };
+        let res = Self::process_req(buf)?;
+        stream.write(res.as_bytes()).await?;
+        stream.flush().await?;
+        Ok(res)
+    }
+
     pub fn run(&mut self, n_thr: Option<usize>) -> io::Result<()> {
         let listener = TcpListener::bind(&self.address)?;
         println!("Server listening: {}{}", "http://", self.address);
@@ -105,10 +138,13 @@ impl Server {
                 }
             }
         }
-        Self::process_req(stream, buf)
+        let res = Self::process_req(buf)?;
+        stream.write(res.as_bytes())?;
+        stream.flush()?;
+        Ok(res)
     }
 
-    pub fn process_req(mut stream: TcpStream, buf: [u8; 1024]) -> io::Result<String> {
+    pub fn process_req(buf: [u8; 1024]) -> io::Result<String> {
         let get = b"GET / HTTP/1.1\r\n";
         let post = b"POST / HTTP/1.1\r\n";
         let delete = b"DELETE / HTTP/1.1\r\n";
@@ -128,8 +164,6 @@ impl Server {
         };
         let file = read_to_string(file)?;
         let res = format!("{}{}", status, file);
-        stream.write(res.as_bytes())?;
-        stream.flush()?;
         Ok(res)
     }
 
