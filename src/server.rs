@@ -69,15 +69,20 @@ impl Server {
     }
 
     pub async fn listen(mut self, n_threads: Option<usize>) -> async_std::io::Result<()> {
-        use async_std::prelude::*;
+        use async_std::{prelude::*, task};
+        println!("Server listening (async): {}{}", "http://", self.address);
         let listener = async_std::net::TcpListener::bind(&self.address).await?;
         let mut incoming = listener.incoming();
         while let Some(stream) = incoming.next().await {
             let stream = stream?;
             println!("Accepting from: {}", stream.peer_addr()?);
-            let _handle = async_std::task::spawn(Self::listen_stream(stream)); // 1
+            let _handle = task::spawn(async move {
+                match Self::listen_stream(stream).await {
+                    Ok(res) => println!("{}: {}", res, "Handled stream"),
+                    Err(_) => eprintln!("Could not handle stream"),
+                };
+            });
         }
-        // self.run(n_threads)?;
         Ok(())
     }
 
@@ -86,7 +91,7 @@ impl Server {
         let reader = async_std::io::BufReader::new(&stream); // 2
         let mut lines = reader.lines();
         let buf = [0; 1024];
-        let request = match lines.next().await {
+        let _request = match lines.next().await {
             None => return Err(async_std::io::ErrorKind::ConnectionAborted.into()),
             Some(line) => println!("request: {:?}", line?),
         };
@@ -100,7 +105,7 @@ impl Server {
         let listener = TcpListener::bind(&self.address)?;
         println!("Server listening: {}{}", "http://", self.address);
         let pool = ThreadPool::new(n_thr)
-        .expect("Could not establish thread pool");
+            .expect("Could not establish thread pool");
         let srv = listener.incoming();
         for (n, stream) in srv.enumerate() {
             match stream {
