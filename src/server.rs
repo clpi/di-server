@@ -4,6 +4,7 @@ pub mod tcp;
 pub mod udp;
 
 use async_std::net::ToSocketAddrs;
+// use futures::stream::StreamExt;
 use dpool::{PoolCreationError, ThreadPool};
 use dargs::Args;
 use dhttp::{Method, HttpRun};
@@ -73,10 +74,6 @@ impl Server {
     }
 
     pub async fn run_async(self, n_threads: Option<usize>) -> async_std::io::Result<()> {
-        self.listen(n_threads).await
-    }
-
-    pub async fn listen(self, n_threads: Option<usize>) -> async_std::io::Result<()> {
         use async_std::{prelude::*, task};
         println!("Server listening (async): {}{}", "http://", self.address);
         let listener = async_std::net::TcpListener::bind(&self.address).await?;
